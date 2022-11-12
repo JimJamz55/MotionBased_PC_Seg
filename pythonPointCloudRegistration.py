@@ -3,6 +3,8 @@ import time
 import cv2
 import numpy as np
 import pyrealsense2 as rs
+import sys
+import open3d as o3d
 
 class AppState:
 
@@ -252,93 +254,194 @@ def draw_registration_result_original_color(source, target, transformation):
                                       lookat=[1.7745, 2.2305, 0.9787],
                                       up=[0.3109, -0.5878, -0.7468])
 
+def draw_registration_result_original_color(source, target, transformation):
+	source_temp = copy.deepcopy(source)
+	source_temp.transform(transformation)
+	o3d.visualization.draw_geometries([source_temp, target], zoom=0.5, front=[-0.2458, -0.8088, 0.5342], lookat=[1.7745, 2.2305, 0.9787], up=[0.3109, -0.5878, -0.7468])
+
+def coloredPointCloudRegistration(source, target):
+	voxel_radius = [0.04, 0.02, 0.01]
+	max_iter = [50, 30, 14]
+	current_transformation = np.identity(4)
+	for scale in range(3):
+		iter = max_iter[scale]
+		radius = voxel_radius[scale]
+		print([iter, radius, scale])
+
+		print("3-1. Downsample with a voxel size %.2f" % radius)
+		source_down = source.voxel_down_sample(radius)
+		target_down = target.voxel_down_sample(radius)
+
+		print("3-2. Estimate normal.")
+		source_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius*2,max_nn=30))
+		target_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius*2,max_nn=30))
+
+
+		print("3-3. Applying colored point cloud registration")
+		result_icp = o3d.pipelines.registration.registration_colored_icp(
+	        source_down, target_down, radius, current_transformation,
+	        o3d.pipelines.registration.TransformationEstimationForColoredICP(),
+	        o3d.pipelines.registration.ICPConvergenceCriteria(relative_fitness=1e-6, relative_rmse=1e-6, max_iteration=iter))
+		current_transformation = result_icp.transformation
+		print(result_icp)
+
+	return current_transformation
+
 out = np.empty((h, w, 3), dtype=np.uint8)
 
-priorPoints = None
+priorVerts = np.array([])
+priorTexcoords = np.array([])
+colors = np.array([])
+transform = np.identity(4)
+pcd = o3d.geometry.PointCloud()
+pcdPrior = o3d.geometry.PointCloud()
 
-for i in range(5):
-	time.sleep(5)
-	
-	frames = pipeline.wait_for_frames()
+#for i in range(1):
+notFirstIteration = False
+while True:
+	#time.sleep(5)
+	if not state.paused:
+		# Wait for a coherent pair of frames: depth and color
+		frames = pipeline.wait_for_frames()
 
-	depth_frame = frames.get_depth_frame()
-	color_frame = frames.get_color_frame()
+		depth_frame = frames.get_depth_frame()
+		color_frame = frames.get_color_frame()
 
-	depth_frame = decimate.process(depth_frame)
+		depth_frame = decimate.process(depth_frame)
 
-        # Grab new intrinsics (may be changed by decimation)
-	depth_intrinsics = rs.video_stream_profile(
-		depth_frame.profile).get_intrinsics()
-	w, h = depth_intrinsics.width, depth_intrinsics.height
+		# Grab new intrinsics (may be changed by decimation)
+		depth_intrinsics = rs.video_stream_profile(
+		    depth_frame.profile).get_intrinsics()
+		w, h = depth_intrinsics.width, depth_intrinsics.height
 
-	depth_image = np.asanyarray(depth_frame.get_data())
-	color_image = np.asanyarray(color_frame.get_data())
+		depth_image = np.asanyarray(depth_frame.get_data())
+		color_image = np.asanyarray(color_frame.get_data())
 
-	depth_colormap = np.asanyarray(
-		colorizer.colorize(depth_frame).get_data())
+		depth_colormap = np.asanyarray(colorizer.colorize(depth_frame).get_data())
 
-	if state.color:
-		mapped_frame, color_source = color_frame, color_image
-	else:
-		mapped_frame, color_source = depth_frame, depth_colormap
+		if state.color:
+		    mapped_frame, color_source = color_frame, color_image
+		else:
+		    mapped_frame, color_source = depth_frame, depth_colormap
 
-	points = pc.calculate(depth_frame)
-	pc.map_to(mapped_frame)
-	
-	#if priorPoints != None:
-	#	pointCloudPointArray = np.asarray(points.points)
-	#	priorPointCloudPointArray = np.asarray(priorPoints.points)
-	#	pointCloudColorArray = np.asarray(points.colors)
-	#	priorPointCloudColorArray = np.asarray(priorPoints.colors)
-	#	
-	#	print("point cloud 1")
-	#	print(pointCloudPointArray)
-	#	print("point cloud 2")
-	#	print(priorPointCloudPointArray)
+		points = pc.calculate(depth_frame)
+		pc.map_to(mapped_frame)
+
+		# Pointcloud data to arrays
+		v, t = points.get_vertices(), points.get_texture_coordinates()
+		verts = np.asanyarray(v).view(np.float32).reshape(-1, 3)  # xyz
+		texcoords = np.asanyarray(t).view(np.float32).reshape(-1, 2)  # uv
 		
-	#	newPointCloudPoints = np.concatenate((pointCloudPointArray, priorPointCloudPointArray), axis=0)
-	#	newPointCloudColors = np.concatenate((pointCloudColorArray, priorPointCloudColorArray), axis=0)
+		for i, j in enumerate(verts):
+			#print("yo")
+			print(color_source.shape)
+			print(color_source)
+		#	print(texcoords[i])
+		#	print(texcoords[i][0])
+		#	print(texcoords[i][1])
+		#	print(color_source[texcoords[i][0]][texcoords[i][1]])
+			#color_source[]
+			#np.append(colors, color_source[])
+		
+		#texcoords = np.asanyarray(t).view(np.float32).reshape(-1, 3)  # uv
+		#texcoords cannot be converted to o3d cloud color. Why?
+		#needs to be array of 3x1 arrays filled with rgb values
+		#currently is... 76800x2 array of something?
+		#vert is 76800x3 which makes sense. Where is third color in texcoords?
+		#so its a uv map of the texture, not the actual colors
+		#how to get colors from librealsense
+		
+		#mytexcoords = np.asarray(t)
+		#print(type(texcoords))
+		#print(dir(texcoords))
+		#print(mytexcoords.shape)
+		#print("print first element of mytexcoords")
+		#print(mytexcoords[1000])
+		#print(texcoords.shape)
+		#print(verts.shape)
+		#print(texcoords)
+		#print(t)
+		#print("color_source")
+		#print(color_source.shape)
+		#print(color_source[10][10])
+		
+		#I'm just going to test saving as .ply then loading back in to o3d
+		points.export_to_ply('./Test.ply', mapped_frame)
+		input_file = "Test.ply"
+		pcdTest = o3d.io.read_point_cloud(input_file) # Read the point cloud
+		
+		points.get_texcolor()
+		
+		#verts = np.asarray(pcdTest.points)
+		#colorsTest = np.asarray(pcdTest.colors)
+		#print(colorsTest)
+		#print(colorsTest.shape)
+		#Now it has the rgb format. let me look into how the librealsense outputs to .ply
 
-	#	print("point cloud 1 and 2")
-	#	print(newPointCloudPoints)
+	#add prior verts to current verts
+	#if priorVerts.any():
+	if notFirstIteration:
+		#pcd.points = o3d.utility.Vector3dVector(verts)
+		#pcd.colors = o3d.utility.Vector3dVector(colorsTest)
+		#pcdPrior.points = o3d.utility.Vector3dVector(priorVerts)
+		#pcdPrior.colors = o3d.utility.Vector3dVector(priorTexcoords)
+		
+		#verts = np.concatenate((verts, priorVerts), axis=0)
+		#texcoords = np.concatenate((colorsTest, priorTexcoords), axis=0)
+		
+		#print(verts.shape)
+		
+		transform = coloredPointCloudRegistration(pcdTest, priorPointCloud)
+		#print(transform)
 
-	# Pointcloud data to arrays
-	v, t = points.get_vertices(), points.get_texture_coordinates()
-	verts = np.asanyarray(v).view(np.float32).reshape(-1, 3)  # xyz
-	texcoords = np.asanyarray(t).view(np.float32).reshape(-1, 2)  # uv
-        
+	#Registration requires o3d pointcloud object. need to convert np ndarrays
+	#steps
+	#must take old and new point cloud and convert to o3d clouds
+	#pass both clouds to colored point cloud registration function above
+	#passes back transform from one to the other
+	#apply transform to new pointcloud (numpy?) and concat them together.
+	#display to see if it worked
+	#use technique to even out density of data (cull copy points so as not to eat up all resources)
+	
 	# Render
-	now = time.time()
+	#now = time.time()
 
-	out.fill(0)
+	#out.fill(0)
 
-	grid(out, (0, 0.5, 1), size=1, n=10)
-	frustum(out, depth_intrinsics)
-	axes(out, view([0, 0, 0]), state.rotation, size=0.1, thickness=1)
+	#grid(out, (0, 0.5, 1), size=1, n=10)
+	#frustum(out, depth_intrinsics)
+	#axes(out, view([0, 0, 0]), state.rotation, size=0.1, thickness=1)
 
-	if not state.scale or out.shape[:2] == (h, w):
-		pointcloud(out, verts, texcoords, color_source)
-	else:
-		tmp = np.zeros((h, w, 3), dtype=np.uint8)
-		pointcloud(tmp, verts, texcoords, color_source)
-		tmp = cv2.resize(
-		tmp, out.shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
-		np.putmask(out, tmp > 0, tmp)
+	#if not state.scale or out.shape[:2] == (h, w):
+	#	pointcloud(out, verts, texcoords, color_source)
+	#else:
+	#	tmp = np.zeros((h, w, 3), dtype=np.uint8)
+	#	pointcloud(tmp, verts, texcoords, color_source)
+	#	tmp = cv2.resize(
+	#	tmp, out.shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
+	#	np.putmask(out, tmp > 0, tmp)
 
-	if any(state.mouse_btns):
-		axes(out, view(state.pivot), state.rotation, thickness=4)
+	#if any(state.mouse_btns):
+	#	axes(out, view(state.pivot), state.rotation, thickness=4)
 
-	dt = time.time() - now
+	#dt = time.time() - now
 
-	cv2.setWindowTitle(
-		state.WIN_NAME, "RealSense (%dx%d) %dFPS (%.2fms) %s" %
-		(w, h, 1.0/dt, dt*1000, "PAUSED" if state.paused else ""))
+	#cv2.setWindowTitle(
+	#	state.WIN_NAME, "RealSense (%dx%d) %dFPS (%.2fms) %s" %
+	#	(w, h, 1.0/dt, dt*1000, "PAUSED" if state.paused else ""))
 
-	cv2.imshow(state.WIN_NAME, out)
+	#cv2.imshow(state.WIN_NAME, out)
 	#key = cv2.waitKey(1)
 	
+	o3d.visualization.draw_geometries([pcdTest])
+	key = cv2.waitKey(1)
+	
 	#input current pointcloud into old pointcloud
-	priorPoints = points 
+	#priorPoints = points
+	#priorVerts = verts
+	#priorTexcoords = colorsTest
+	priorPointCloud = pcdTest
+	notFirstIteration = True
 	
 pipeline.stop()
 	
