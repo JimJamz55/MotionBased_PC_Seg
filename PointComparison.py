@@ -1,8 +1,10 @@
 # examples/Python/Basic/icp_registration.py
+from math import dist
 
 import open3d as o3d
 import numpy as np
 import copy
+from rtree import index
 
 from matplotlib import pyplot as plt
 
@@ -15,10 +17,7 @@ def draw_registration_result(source, target, transformation):
     source_temp.transform(transformation)
     o3d.visualization.draw_geometries([source_temp, target_temp])
 
-
-if __name__ == "__main__":
-    source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
-    target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
+def combinePoints(source, target):
     # threshold = 0.02
     # trans_init = np.asarray([[0.862, 0.011, -0.507, 0.5],
     #                          [-0.139, 0.967, -0.215, 0.7],
@@ -81,4 +80,49 @@ if __name__ == "__main__":
                                              if max_label > 0 else 1))
     colors[labels < 0] = 0
     pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-    o3d.visualization.draw_geometries([pcd])
+    # o3d.visualization.draw_geometries([pcd])
+
+    return p3_load, p3_color
+
+def sparse_subset3(points, r):
+    """Return a maximal list of elements of points such that no pairs of
+    points in the result have distance less than r.
+    https://codereview.stackexchange.com/questions/196104/removing-neighbors-in-a-point-cloud
+    """
+    result = []
+    pro = index.Property()
+    pro.dimension = 3
+    # pro.dat_extension = 'data'
+    # pro.idx_extension = 'index'
+    idx3d = index.Index(properties=pro)
+    # idx3d.insert(1, (0, 60, 23.0, 0, 60, 42.0))
+    # idx3d.intersection((-1, 62, 22, -1, 62, 43))
+    for i, p in enumerate(points):
+        px, py, pz = p
+        nearby = idx3d.intersection((px - r, py - r, pz - r, px + r, py + r, pz + r))
+        if all(dist(p, points[j]) >= r for j in nearby):
+            result.append(p)
+            idx3d.insert(i, (px, py, pz, px, py, pz))
+    return result
+
+
+if __name__ == "__main__":
+    source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
+    target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
+    p3_load, p3_color = combinePoints(source,target)
+    listOfRedPoints = sparse_subset3(p3_load, 0.1)
+    if len(listOfRedPoints) > 0:
+        reducedPoints = np.vstack(listOfRedPoints)
+
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(reducedPoints)
+        pcd.colors = o3d.utility.Vector3dVector(p3_color)
+
+        labels = np.array(pcd.cluster_dbscan(eps=0.01, min_points=100))
+        max_label = labels.max()
+        colors = plt.get_cmap("tab20")(labels / (max_label
+                                                 if max_label > 0 else 1))
+        colors[labels < 0] = 0
+        pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+        o3d.visualization.draw_geometries([pcd])
+    print("DONE")
