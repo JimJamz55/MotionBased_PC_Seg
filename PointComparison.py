@@ -61,9 +61,9 @@ def combinePoints(source, target):
     p1_color = np.asarray(source_temp.colors)
     p2_color = np.asarray(target_temp.colors)
     p3_color = np.concatenate((p1_color, p2_color), axis=0)
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(p3_load)
-    pcd.colors = o3d.utility.Vector3dVector(p3_color)
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(p3_load)
+    # pcd.colors = o3d.utility.Vector3dVector(p3_color)
     # o3d.io.write_point_cloud("ObjMoveEx/combined.ply",p3_load)
 
     # pcd = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
@@ -74,22 +74,23 @@ def combinePoints(source, target):
     # outlier_cloud.paint_uniform_color([0.6, 0.6, 0.6])
     # o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
 
-    labels = np.array(pcd.cluster_dbscan(eps=0.01, min_points=100))
-    max_label = labels.max()
-    colors = plt.get_cmap("tab20")(labels / (max_label
-                                             if max_label > 0 else 1))
-    colors[labels < 0] = 0
-    pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+    # labels = np.array(pcd.cluster_dbscan(eps=0.01, min_points=100))
+    # max_label = labels.max()
+    # colors = plt.get_cmap("tab20")(labels / (max_label
+    #                                          if max_label > 0 else 1))
+    # colors[labels < 0] = 0
+    # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
     # o3d.visualization.draw_geometries([pcd])
 
     return p3_load, p3_color
 
-def sparse_subset3(points, r):
+def sparse_subset3(points,colors, r):
     """Return a maximal list of elements of points such that no pairs of
     points in the result have distance less than r.
     https://codereview.stackexchange.com/questions/196104/removing-neighbors-in-a-point-cloud
     """
     result = []
+    resultC = []
     pro = index.Property()
     pro.dimension = 3
     # pro.dat_extension = 'data'
@@ -102,27 +103,33 @@ def sparse_subset3(points, r):
         nearby = idx3d.intersection((px - r, py - r, pz - r, px + r, py + r, pz + r))
         if all(dist(p, points[j]) >= r for j in nearby):
             result.append(p)
+            resultC.append(colors[i])
             idx3d.insert(i, (px, py, pz, px, py, pz))
-    return result
+
+    if len(result) > 0:
+        result = np.vstack(result)
+
+    if len(resultC) > 0:
+        resultC = np.vstack(resultC)
+
+    return result, resultC
 
 
 if __name__ == "__main__":
     source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
     target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
     p3_load, p3_color = combinePoints(source,target)
-    listOfRedPoints = sparse_subset3(p3_load, 0.1)
-    if len(listOfRedPoints) > 0:
-        reducedPoints = np.vstack(listOfRedPoints)
+    listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
 
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(reducedPoints)
-        pcd.colors = o3d.utility.Vector3dVector(p3_color)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(listOfRedPoints)
+    pcd.colors = o3d.utility.Vector3dVector(listOfRedColors)
 
-        labels = np.array(pcd.cluster_dbscan(eps=0.01, min_points=100))
-        max_label = labels.max()
-        colors = plt.get_cmap("tab20")(labels / (max_label
-                                                 if max_label > 0 else 1))
-        colors[labels < 0] = 0
-        pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-        o3d.visualization.draw_geometries([pcd])
+    # labels = np.array(pcd.cluster_dbscan(eps=0.01, min_points=100))
+    # max_label = labels.max()
+    # colors = plt.get_cmap("tab20")(labels / (max_label
+    #                                          if max_label > 0 else 1))
+    # colors[labels < 0] = 0
+    # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+    o3d.visualization.draw_geometries([pcd])
     print("DONE")
