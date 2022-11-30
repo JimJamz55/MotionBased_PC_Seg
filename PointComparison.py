@@ -151,34 +151,13 @@ def ransacDB(pcd):
 
     unique, counts = np.unique(labels, return_counts=True)
     order_labels = np.argsort(counts)
-    # colors[labels < 0] = 0
-    # colors[labels != 909090909090909090] = 0
-    # colors[labels == order_labels[-1]] = [0.0356, 0.096, 0.043, 0]
-    # colors[labels == order_labels[-2]] = [0.01234, 0.1234, 0.09382, 0]
+
+    colors_temp = copy.deepcopy(colors)
     colors[labels != order_labels[-1]] = 0
+    colors_temp[labels != order_labels[-2]] = 0
+    colors = colors+colors_temp
 
-    # colors1 = colors[labels != order_labels[-1]] = 0
-    # colors2 = colors[labels != order_labels[-2]] = 0
-    # colors = colors1+colors2
-    # for num, i in enumerate(labels):
-    #     if i != order_labels[-1] or i != order_labels[-2]:
-    #         colors[num] = 0
     pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
-
-    # segment_models = {}
-    # segments = {}
-    # max_plane_idx = 20
-    # rest = pcd
-    # for i in range(max_plane_idx):
-    #     colors = plt.get_cmap("tab20")(i)
-    #     segment_models[i], inliers = rest.segment_plane(
-    #         distance_threshold=0.01, ransac_n=3, num_iterations=1000)
-    #     segments[i] = rest.select_by_index(inliers)
-    #     labels = np.array(segments[i].cluster_dbscan(eps=d_threshold * 10, min_points=10))
-    #     segments[i].paint_uniform_color(list(colors[:3]))
-    #     rest = rest.select_by_index(inliers, invert=True)
-    #     print("pass", i, "/", max_plane_idx, "done.")
-
     return pcd
 
 if __name__ == "__main__":
