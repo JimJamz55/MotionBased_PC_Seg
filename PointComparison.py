@@ -84,6 +84,12 @@ def combinePoints(source, target):
 
     return p3_load, p3_color
 
+def numpyToPC(points, colors):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+    return pcd
+
 def sparse_subset3(points,colors,r):
     """Return a maximal list of elements of points such that no pairs of
     points in the result have distance less than r.
@@ -121,43 +127,24 @@ def differencePoints(source, target,r):
     points2 = np.asarray(target_temp.points)
     colors1 = np.asarray(source_temp.colors)
     colors2 = np.asarray(target_temp.colors)
+    test = source.compute_point_cloud_distance(target)
+    listOfRedPoints = []
+    listOfRedColors = []
+    for i, val in enumerate(test):
+        if val > r:
+            listOfRedPoints.append(points1[i])
+            listOfRedColors.append(colors1[i])
 
-    result1 = []
-    resultC1 = []
-    # result2 = []
-    # resultC2 = []
-    pro = index.Property()
-    pro.dimension = 3
-    idx3d = index.Index(properties=pro)
-    for i, p in enumerate(points1):
-        px, py, pz = p
-        nearby = idx3d.intersection((px - r, py - r, pz - r, px + r, py + r, pz + r))
-        if all(dist(p, points1[j]) >= r for j in nearby):
-            result1.append(p)
-            resultC1.append(colors1[i])
-            idx3d.insert(i, (px, py, pz, px, py, pz))
-
-    if len(result1) > 0:
-        result = np.vstack(result1)
-
-    if len(resultC1) > 0:
-        resultC = np.vstack(resultC1)
-
-    # pcd1 = o3d.geometry.PointCloud()
-    # pcd1.points = o3d.utility.Vector3dVector(result1)
-    # pcd1.colors = o3d.utility.Vector3dVector(resultC1)
-
-    return result1, resultC1
+    return listOfRedPoints, listOfRedColors
 
 if __name__ == "__main__":
     source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
     target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
-    p3_load, p3_color = combinePoints(source,target)
-    # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
-    listOfRedPoints, listOfRedColors = differencePoints(source, target, 0.1)
+    # p3_load, p3_color = combinePoints(source,target)
 
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(listOfRedPoints)
-    pcd.colors = o3d.utility.Vector3dVector(listOfRedColors)
+    # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
+    listOfRedPoints, listOfRedColors = differencePoints(source, target, 0.07)
+
+    pcd = numpyToPC(listOfRedPoints,listOfRedColors)
     o3d.visualization.draw_geometries([pcd])
     print("DONE")
