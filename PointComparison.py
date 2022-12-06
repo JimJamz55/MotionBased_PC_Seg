@@ -137,7 +137,7 @@ def differencePoints(source, target, padding):
 
     return listOfRedPoints, listOfRedColors
 
-def ransacDB(pcd):
+def ransacDB(pcd, highlight):
     plane_model, inliers = pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
     # inlier_cloud = pcd.select_by_index(inliers)
     # outlier_cloud = pcd.select_by_index(inliers, invert=True)
@@ -146,19 +146,72 @@ def ransacDB(pcd):
     # o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
 
     labels = np.array(pcd.cluster_dbscan(eps=0.05, min_points=0))
-    max_label = labels.max()
-    colors = plt.get_cmap("tab20")((labels / (max_label if max_label > 0 else 1)))
 
     unique, counts = np.unique(labels, return_counts=True)
     order_labels = np.argsort(counts)
 
-    colors_temp = copy.deepcopy(colors)
-    colors[labels != order_labels[-1]] = 0
-    colors_temp[labels != order_labels[-2]] = 0
-    colors = colors+colors_temp
+    if highlight:
+        max_label = labels.max()
+        colors = plt.get_cmap("tab20")((labels / (max_label if max_label > 0 else 1)))
+        colors_temp = copy.deepcopy(colors)
+        colors[labels != order_labels[-1]] = 0
+        colors_temp[labels != order_labels[-2]] = 0
+        colors = colors+colors_temp
 
-    pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+        pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+
+    return pcd, labels, order_labels
+
+def pcOnlyLabel(pcd, target, labels):
+    source_temp = copy.deepcopy(pcd)
+    points = np.asarray(source_temp.points)
+    colors = np.asarray(source_temp.colors)
+    listOfRedPoints = []
+    listOfRedColors = []
+    for i, val in enumerate(labels):
+        if val == target:
+            listOfRedPoints.append(points[i])
+            listOfRedColors.append(colors[i])
+
+    pcd = numpyToPC(listOfRedPoints, listOfRedColors)
+
+    # colors = plt.get_cmap("tab20")((labels / 10)) #arbitrary value
+    # colors[labels != target] = 0
+    # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
     return pcd
+
+def getCOMMainClusters(pcd,labels,order_labels):
+    source_temp = copy.deepcopy(pcd)
+    points = np.asarray(source_temp.points)
+    coords = [[], []]
+    COMs = []
+    for i, label in enumerate(labels):
+        if label == order_labels[-1]:
+            coords[0].append(points[i])
+        elif label == order_labels[-2]:
+            coords[1].append(points[i])
+    for list in coords:
+        sumX = 0;
+        sumY = 0;
+        sumZ = 0;
+        count = len(list);
+        for coord in list:
+            sumX += coord[0]
+            sumY += coord[1]
+            sumZ += coord[2]
+        COMs.append((sumX/count, sumY/count, sumZ/count))
+    return COMs
+
+def likelyObject(pcd,labels,order_labels):
+    """
+    Assume most likely object is the one closer to camera
+    """
+    COMs = getCOMMainClusters(pcd, labels, order_labels)
+    print(COMs)
+    if abs(COMs[0][2]) > abs(COMs[1][2]):
+        return order_labels[-2]
+    else:
+        return order_labels[-1]
 
 if __name__ == "__main__":
     source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
@@ -167,8 +220,12 @@ if __name__ == "__main__":
 
     # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
     listOfRedPoints, listOfRedColors = differencePoints(source, target, 0)
-
     pcd = numpyToPC(listOfRedPoints,listOfRedColors)
-    pcd = ransacDB(pcd)
+
+    pcd,labels,order_labels = ransacDB(pcd, highlight=False)
+    objectLabel = likelyObject(pcd, labels, order_labels)
+    print(order_labels,objectLabel)
+    pcd = pcOnlyLabel(pcd,objectLabel,labels)
+
     o3d.visualization.draw_geometries([pcd])
     print("DONE")
