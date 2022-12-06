@@ -4,6 +4,8 @@ from math import dist
 import open3d as o3d
 import numpy as np
 import copy
+
+import open3d.cpu.pybind.geometry
 from rtree import index
 
 from matplotlib import pyplot as plt
@@ -207,11 +209,40 @@ def likelyObject(pcd,labels,order_labels):
     Assume most likely object is the one closer to camera
     """
     COMs = getCOMMainClusters(pcd, labels, order_labels)
-    print(COMs)
-    if abs(COMs[0][2]) > abs(COMs[1][2]):
+    # print(COMs)
+    if COMs[0][2] < COMs[1][2]:
         return order_labels[-2]
     else:
         return order_labels[-1]
+
+def getOrienBoundBox(pcd):
+    bb = open3d.cpu.pybind.geometry.OrientedBoundingBox.create_from_points(pcd.points, robust=False)
+    return bb
+
+def drawBB(bb, vis):
+    # https://stackoverflow.com/questions/62938546/how-to-draw-bounding-boxes-and-update-them-real-time-in-python
+    corners = np.asarray(bb.get_box_points())
+    # Our lines span from points 0 to 1, 1 to 2, 2 to 3, etc...
+    # lines = [[0, 1], [1, 2], [2, 3], [0, 3],
+    #          [4, 5], [5, 6], [6, 7], [4, 7],
+    #          [0, 4], [1, 5], [2, 6], [3, 7]]
+
+    lines = [[0, 3], [3, 5], [5, 2], [2, 0],
+             [1, 6], [6, 4], [4, 7], [7, 1],
+             [1, 0], [3, 6], [4, 5], [7, 2]]
+
+    # Use the same color for all lines
+    colors = [[1, 0, 0] for _ in range(len(lines))]
+
+    line_set = o3d.geometry.LineSet()
+    line_set.points = o3d.utility.Vector3dVector(corners)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    line_set.colors = o3d.utility.Vector3dVector(colors)
+
+    # Display the bounding boxes:
+    vis.add_geometry(line_set)
+
+
 
 if __name__ == "__main__":
     source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
@@ -224,8 +255,15 @@ if __name__ == "__main__":
 
     pcd,labels,order_labels = ransacDB(pcd, highlight=False)
     objectLabel = likelyObject(pcd, labels, order_labels)
-    print(order_labels,objectLabel)
+    # print(order_labels,objectLabel)
     pcd = pcOnlyLabel(pcd,objectLabel,labels)
 
-    o3d.visualization.draw_geometries([pcd])
+    bb = getOrienBoundBox(pcd)
+
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    drawBB(bb, vis)
+    vis.add_geometry(pcd)
+    vis.run()
+    vis.destroy_window()
     print("DONE")
