@@ -216,7 +216,7 @@ def likelyObject(pcd, labels, order_labels):
     Assume most likely object is the one closer to camera
     """
     COMs = getCOMMainClusters(pcd, labels, order_labels)
-    print(COMs)
+    # print(COMs)
     if abs(COMs[0][2]) > abs(COMs[1][2]):
         return order_labels[-2]
     else:
@@ -251,29 +251,52 @@ def drawBB(bb, vis):
     # Display the bounding boxes:
     vis.add_geometry(line_set)
 
+def colorSegs(pcd,color,threshold):
+    color = np.asarray(color)/255
+    threshold /= 255
+    source_temp = copy.deepcopy(pcd)
+    points = np.asarray(source_temp.points)
+    colors = np.asarray(source_temp.colors)
+    pointSegs = np.empty((0, 3), float)
+    colorSegs = np.empty((0, 3), float)
+    for i, pointColor in enumerate(colors[:, 0:3]):
+        if abs(pointColor[0] - color[0]) < threshold and abs(pointColor[1] - color[1]) < threshold and abs(pointColor[2] - color[2]) < threshold:
+            colorSegs = np.append(colorSegs, np.array([pointColor]), axis=0)
+            pointSegs = np.append(pointSegs, np.array([points[i, 0:3]]), axis=0)
+
+    return numpyToPC(pointSegs, colorSegs)
 
 if __name__ == "__main__":
-    # source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
-    # target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
-    source = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos1/red_box_simple_background_pos1.ply")
-    target = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos2/red_box_simple_background_pos2.ply")
+    source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
+    target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
+    # source = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos1/red_box_simple_background_pos1.ply")
+    # target = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos2/red_box_simple_background_pos2.ply")
     # p3_load, p3_color = combinePoints(source,target)
+    colorSegmenting = False
+    boundingBox = True
 
-    # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
-    listOfRedPoints, listOfRedColors = differencePoints(source, target, 0)
-    pcd = numpyToPC(listOfRedPoints, listOfRedColors)
+    if colorSegmenting:
+        pcd = colorSegs(source, [0, 0, 0], 26)
+    else:
+        # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
+        listOfRedPoints, listOfRedColors = differencePoints(source, target, 0)
+        pcd = numpyToPC(listOfRedPoints, listOfRedColors)
 
-    pcd, labels, order_labels = ransacDB(pcd, highlight=False)
-    objectLabel = likelyObject(pcd, labels, order_labels)
-    # print(order_labels,objectLabel)
-    pcd = pcOnlyLabel(pcd, objectLabel, labels)
+        pcd, labels, order_labels = ransacDB(pcd, highlight=False)
+        objectLabel = likelyObject(pcd, labels, order_labels)
+        # print(order_labels,objectLabel)
+        # pcd = pcOnlyLabel(pcd, objectLabel, labels)
 
-    bb = getOrienBoundBox(pcd)
-    print(bb.volume())
-
+    """
+    Display stuff
+    """
     vis = o3d.visualization.Visualizer()
     vis.create_window()
-    drawBB(bb, vis)
+    if boundingBox:
+        bb = getOrienBoundBox(pcd)
+        print(bb.volume())
+        drawBB(bb, vis)
+
     vis.add_geometry(pcd)
     vis.run()
     vis.destroy_window()
