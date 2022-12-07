@@ -216,8 +216,8 @@ def likelyObject(pcd, labels, order_labels):
     Assume most likely object is the one closer to camera
     """
     COMs = getCOMMainClusters(pcd, labels, order_labels)
-    # print(COMs)
-    if COMs[0][2] < COMs[1][2]:
+    print(COMs)
+    if abs(COMs[0][2]) > abs(COMs[1][2]):
         return order_labels[-2]
     else:
         return order_labels[-1]
@@ -253,8 +253,10 @@ def drawBB(bb, vis):
 
 
 if __name__ == "__main__":
-    source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
-    target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
+    # source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
+    # target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
+    source = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos1/red_box_simple_background_pos1.ply")
+    target = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos2/red_box_simple_background_pos2.ply")
     # p3_load, p3_color = combinePoints(source,target)
 
     # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)

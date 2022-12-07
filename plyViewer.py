@@ -2,7 +2,7 @@ import numpy as np
 import open3d as o3d
 
 # Read .ply file
-input_file = "out.ply"
+input_file = "SegmentationData/simpleBackground/pos2/blue_tape_simple_background_pos2.ply"
 pcd = o3d.io.read_point_cloud(input_file) # Read the point cloud
 
 # Visualize the point cloud within open3d
@@ -16,7 +16,7 @@ point_cloud_in_numpy = np.asarray(pcd.points)
 colors = np.asarray(pcd.colors)
 #print("cloud colors")
 #print(colors[:,2])
-#colorsOrange = colors[:,0] ==1# and colors[:,1] > 127 and colors[:,2] < 80  
+#colorsOrange = colors[:,0] ==1# and colors[:,1] > 127 and colors[:,2] < 80
 #colorsOrange = [colors if colors[:,2] < 80 else 0 for colorsGreen in colors[:,2]]
 #colorsOrange = np.array([colors[:,3] for ])
 pointOrange = np.empty((0,3), float)
@@ -43,12 +43,12 @@ for i, pointColor in enumerate(colors[:,0:3]):
 #print("pointPosOrange")
 #print(pointPosOrange)
 
-pcdOrange = o3d.geometry.PointCloud()
-pcdOrange.points = o3d.utility.Vector3dVector(pointPosOrange)
-pcdOrange.colors = o3d.utility.Vector3dVector(pointOrange)
-o3d.visualization.draw_geometries([pcdOrange])
+#pcdOrange = o3d.geometry.PointCloud()
+#pcdOrange.points = o3d.utility.Vector3dVector(pointPosOrange)
+#pcdOrange.colors = o3d.utility.Vector3dVector(pointOrange)
+#o3d.visualization.draw_geometries([pcdOrange])
 
-#pcdWithoutGreen = o3d.geometry.PointCloud()
-#pcdWithoutGreen.points = o3d.utility.Vector3dVector(point_cloud_in_numpy)
-#pcdWithoutGreen.colors = o3d.utility.Vector3dVector(colorsOrange)
-#o3d.visualization.draw_geometries([pcdWithoutGreen])
+pcdWithoutGreen = o3d.geometry.PointCloud()
+pcdWithoutGreen.points = o3d.utility.Vector3dVector(point_cloud_in_numpy)
+pcdWithoutGreen.colors = o3d.utility.Vector3dVector(colors)
+o3d.visualization.draw_geometries([pcdWithoutGreen])
