@@ -5,7 +5,6 @@ import open3d as o3d
 import numpy as np
 import copy
 
-import open3d.cpu.pybind.geometry
 from rtree import index
 
 from matplotlib import pyplot as plt
@@ -18,6 +17,7 @@ def draw_registration_result(source, target, transformation):
     # target_temp.paint_uniform_color([0, 0.651, 0.929])
     source_temp.transform(transformation)
     o3d.visualization.draw_geometries([source_temp, target_temp])
+
 
 def combinePoints(source, target):
     # threshold = 0.02
@@ -41,8 +41,8 @@ def combinePoints(source, target):
     # # draw_registration_result(source, target, reg_p2p.transformation)
     #
     transformation = np.asarray([[1.0, 0.0, 0.0, 0.0],
-                             [0.0, 1.0, 0.0, 0.0],
-                             [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+                                 [0.0, 1.0, 0.0, 0.0],
+                                 [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     # draw_registration_result(source, target, transformation)
 
     # print("Apply point-to-plane ICP")
@@ -86,13 +86,15 @@ def combinePoints(source, target):
 
     return p3_load, p3_color
 
+
 def numpyToPC(points, colors):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     pcd.colors = o3d.utility.Vector3dVector(colors)
     return pcd
 
-def sparse_subset3(points,colors,r):
+
+def sparse_subset3(points, colors, r):
     """Return a maximal list of elements of points such that no pairs of
     points in the result have distance less than r.
     https://codereview.stackexchange.com/questions/196104/removing-neighbors-in-a-point-cloud
@@ -122,6 +124,7 @@ def sparse_subset3(points,colors,r):
 
     return result, resultC
 
+
 def differencePoints(source, target, padding):
     source_temp = copy.deepcopy(source)
     points = np.asarray(source_temp.points)
@@ -129,15 +132,16 @@ def differencePoints(source, target, padding):
     distances = source.compute_point_cloud_distance(target)
     listOfRedPoints = []
     listOfRedColors = []
-    twentyfifth, seventyfifth = np.quantile(distances, [0.25,0.75])
-    iqr = seventyfifth-twentyfifth
-    upperFence = seventyfifth+3*iqr
+    twentyfifth, seventyfifth = np.quantile(distances, [0.25, 0.75])
+    iqr = seventyfifth - twentyfifth
+    upperFence = seventyfifth + 3 * iqr
     for i, val in enumerate(distances):
         if val > upperFence + padding:
             listOfRedPoints.append(points[i])
             listOfRedColors.append(colors[i])
 
     return listOfRedPoints, listOfRedColors
+
 
 def ransacDB(pcd, highlight):
     plane_model, inliers = pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
@@ -158,11 +162,12 @@ def ransacDB(pcd, highlight):
         colors_temp = copy.deepcopy(colors)
         colors[labels != order_labels[-1]] = 0
         colors_temp[labels != order_labels[-2]] = 0
-        colors = colors+colors_temp
+        colors = colors + colors_temp
 
         pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
 
     return pcd, labels, order_labels
+
 
 def pcOnlyLabel(pcd, target, labels):
     source_temp = copy.deepcopy(pcd)
@@ -182,7 +187,8 @@ def pcOnlyLabel(pcd, target, labels):
     # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
     return pcd
 
-def getCOMMainClusters(pcd,labels,order_labels):
+
+def getCOMMainClusters(pcd, labels, order_labels):
     source_temp = copy.deepcopy(pcd)
     points = np.asarray(source_temp.points)
     coords = [[], []]
@@ -193,18 +199,19 @@ def getCOMMainClusters(pcd,labels,order_labels):
         elif label == order_labels[-2]:
             coords[1].append(points[i])
     for list in coords:
-        sumX = 0;
-        sumY = 0;
-        sumZ = 0;
-        count = len(list);
+        sumX = 0
+        sumY = 0
+        sumZ = 0
+        count = len(list)
         for coord in list:
             sumX += coord[0]
             sumY += coord[1]
             sumZ += coord[2]
-        COMs.append((sumX/count, sumY/count, sumZ/count))
+        COMs.append((sumX / count, sumY / count, sumZ / count))
     return COMs
 
-def likelyObject(pcd,labels,order_labels):
+
+def likelyObject(pcd, labels, order_labels):
     """
     Assume most likely object is the one closer to camera
     """
@@ -215,9 +222,11 @@ def likelyObject(pcd,labels,order_labels):
     else:
         return order_labels[-1]
 
+
 def getOrienBoundBox(pcd):
-    bb = open3d.cpu.pybind.geometry.OrientedBoundingBox.create_from_points(pcd.points, robust=False)
+    bb = o3d.geometry.OrientedBoundingBox.create_from_points(pcd.points, robust=False)
     return bb
+
 
 def drawBB(bb, vis):
     # https://stackoverflow.com/questions/62938546/how-to-draw-bounding-boxes-and-update-them-real-time-in-python
@@ -243,7 +252,6 @@ def drawBB(bb, vis):
     vis.add_geometry(line_set)
 
 
-
 if __name__ == "__main__":
     source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
     target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
@@ -251,14 +259,15 @@ if __name__ == "__main__":
 
     # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
     listOfRedPoints, listOfRedColors = differencePoints(source, target, 0)
-    pcd = numpyToPC(listOfRedPoints,listOfRedColors)
+    pcd = numpyToPC(listOfRedPoints, listOfRedColors)
 
-    pcd,labels,order_labels = ransacDB(pcd, highlight=False)
+    pcd, labels, order_labels = ransacDB(pcd, highlight=False)
     objectLabel = likelyObject(pcd, labels, order_labels)
     # print(order_labels,objectLabel)
-    pcd = pcOnlyLabel(pcd,objectLabel,labels)
+    pcd = pcOnlyLabel(pcd, objectLabel, labels)
 
     bb = getOrienBoundBox(pcd)
+    print(bb.volume())
 
     vis = o3d.visualization.Visualizer()
     vis.create_window()
