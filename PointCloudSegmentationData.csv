@@ -1,0 +1,13 @@
+,Scenario,Threshold,Color(RGB),Volume
+0,DBscan_blue_tape_complex_background,,,0.12749107474391413
+1,DBscan_coke_can_complex_background,,,0.17579019316251376
+2,DBscan_red_box_complex_background,,,0.08617212622335471
+3,DBscan_blue_tape_simple_background,,,0.18560995758928708
+4,DBscan_coke_can_simple_background,,,0.13136887571169376
+5,DBscan_red_box_simple_background,,,0.13073985479471423
+6,colorSeg_blue_tape_complex_background,30,"[70, 50, 20]",0.07972640774440087
+7,colorSeg_coke_can_complex_background,60,"[53, 10, 160]",0.025743174306898833
+8,colorSeg_red_box_complex_background,120,"[63, 0, 255]",0.02413122127328901
+9,colorSeg_blue_tape_simple_background,30,"[70, 50, 20]",0.055862410101821844
+10,colorSeg_coke_can_simple_background,60,"[53, 10, 160]",0.005157537613196202
+11,colorSeg_red_box_simple_background,120,"[63, 0, 255]",0.0026892034870323977

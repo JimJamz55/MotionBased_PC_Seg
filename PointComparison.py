@@ -4,6 +4,7 @@ from math import dist
 import open3d as o3d
 import numpy as np
 import copy
+import pandas as pd
 
 from rtree import index
 
@@ -266,38 +267,153 @@ def colorSegs(pcd,color,threshold):
 
     return numpyToPC(pointSegs, colorSegs)
 
-if __name__ == "__main__":
-    source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
-    target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
-    # source = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos1/red_box_simple_background_pos1.ply")
-    # target = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos2/red_box_simple_background_pos2.ply")
-    # p3_load, p3_color = combinePoints(source,target)
-    colorSegmenting = False
-    boundingBox = True
-
-    if colorSegmenting:
-        pcd = colorSegs(source, [0, 0, 0], 26)
-    else:
-        # listOfRedPoints, listOfRedColors = sparse_subset3(p3_load, p3_color, 0.01)
+def test_routine(files, data, target_colors, target_thresholds):
+    for i in np.arange(0, 3, 1):
+        source = o3d.io.read_point_cloud(files[i])
+        target = o3d.io.read_point_cloud(files[i+3])
         listOfRedPoints, listOfRedColors = differencePoints(source, target, 0)
         pcd = numpyToPC(listOfRedPoints, listOfRedColors)
 
         pcd, labels, order_labels = ransacDB(pcd, highlight=False)
         objectLabel = likelyObject(pcd, labels, order_labels)
-        # print(order_labels,objectLabel)
-        # pcd = pcOnlyLabel(pcd, objectLabel, labels)
 
-    """
-    Display stuff
-    """
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    if boundingBox:
         bb = getOrienBoundBox(pcd)
-        print(bb.volume())
+        
+        vis = o3d.visualization.Visualizer()
+        vis.create_window()
+        
+        bb = getOrienBoundBox(pcd)
+        #print(bb.volume())
         drawBB(bb, vis)
+        
+        print('DBscan_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0])
+        data = data.append({'Scenario' : 'DBscan_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0], 'Volume' : bb.volume()}, ignore_index = True)
 
-    vis.add_geometry(pcd)
-    vis.run()
-    vis.destroy_window()
-    print("DONE")
+        vis.add_geometry(pcd)
+        vis.run()
+        vis.destroy_window()
+        
+    for i in np.arange(6, 9, 1):
+        source = o3d.io.read_point_cloud(files[i])
+        target = o3d.io.read_point_cloud(files[i+3])
+        listOfRedPoints, listOfRedColors = differencePoints(source, target, 0)
+        pcd = numpyToPC(listOfRedPoints, listOfRedColors)
+
+        pcd, labels, order_labels = ransacDB(pcd, highlight=False)
+        objectLabel = likelyObject(pcd, labels, order_labels)
+
+        bb = getOrienBoundBox(pcd)
+        
+        vis = o3d.visualization.Visualizer()
+        vis.create_window()
+        
+        bb = getOrienBoundBox(pcd)
+        #print(bb.volume())
+        drawBB(bb, vis)
+        
+        print('DBscan_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0])
+        data = data.append({'Scenario' : 'DBscan_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0], 'Volume' : bb.volume()}, ignore_index = True)
+
+        vis.add_geometry(pcd)
+        vis.run()
+        vis.destroy_window()
+        
+    for i in np.arange(0, 3, 1):
+        source = o3d.io.read_point_cloud(files[i])
+        pcd = colorSegs(source, target_colors[i], target_thresholds[i])
+        
+        bb = getOrienBoundBox(pcd)
+        
+        vis = o3d.visualization.Visualizer()
+        vis.create_window()
+        
+        bb = getOrienBoundBox(pcd)
+        #print(bb.volume())
+        drawBB(bb, vis)
+        
+        print('colorSeg_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0])
+        data = data.append({'Scenario' : 'colorSeg_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0], 'Threshold' : target_thresholds[i], 'Color(RGB)' : target_colors[i], 'Volume' : bb.volume()}, ignore_index = True)
+        
+        vis.add_geometry(pcd)
+        vis.run()
+        vis.destroy_window()
+        
+    for i in np.arange(6, 9, 1):
+        source = o3d.io.read_point_cloud(files[i])
+        pcd = colorSegs(source, target_colors[i-6], target_thresholds[i-6])
+        
+        bb = getOrienBoundBox(pcd)
+        
+        vis = o3d.visualization.Visualizer()
+        vis.create_window()
+        
+        bb = getOrienBoundBox(pcd)
+        #print(bb.volume())
+        drawBB(bb, vis)
+        
+        print('colorSeg_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0])
+        data = data.append({'Scenario' : 'colorSeg_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0], 'Threshold' : target_thresholds[i-6], 'Color(RGB)' : target_colors[i-6], 'Volume' : bb.volume()}, ignore_index = True)
+        
+        vis.add_geometry(pcd)
+        vis.run()
+        vis.destroy_window()
+    return data
+    
+    
+
+if __name__ == "__main__":
+    files = ["SegmentationData/complexBackground/pos1/blue_tape_complex_background_pos1.ply", "SegmentationData/complexBackground/pos1/coke_can_complex_background_pos1.ply", "SegmentationData/complexBackground/pos1/red_box_complex_background_pos1.ply", "SegmentationData/complexBackground/pos2/blue_tape_complex_background_pos2.ply", "SegmentationData/complexBackground/pos2/coke_can_complex_background_pos2.ply", "SegmentationData/complexBackground/pos2/red_box_complex_background_pos2.ply", "SegmentationData/simpleBackground/pos1/blue_tape_simple_background_pos1.ply", "SegmentationData/simpleBackground/pos1/coke_can_simple_background_pos1.ply", "SegmentationData/simpleBackground/pos1/red_box_simple_background_pos1.ply", "SegmentationData/simpleBackground/pos2/blue_tape_simple_background_pos2.ply", "SegmentationData/simpleBackground/pos2/coke_can_simple_background_pos2.ply", "SegmentationData/simpleBackground/pos2/red_box_simple_background_pos2.ply"]
+
+    data = pd.DataFrame(columns=['Scenario', 'Threshold', 'Color(RGB)', 'Volume'])
+    
+    orange_tape_color = [70, 50, 20]
+    orange_tape_threshold = 30
+    
+    blue_soda_can_color = [53, 10, 160]
+    blue_soda_can_threshold = 60
+    
+    blue_box_color = [63, 0, 255]
+    blue_box_threshold = 120
+    
+    target_colors = [orange_tape_color, blue_soda_can_color, blue_box_color]
+    target_thresholds = [orange_tape_threshold, blue_soda_can_threshold, blue_box_threshold]
+
+    #source = o3d.io.read_point_cloud("ObjMoveEx/bottle1.ply")
+    #target = o3d.io.read_point_cloud("ObjMoveEx/bottle2.ply")
+    # source = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos1/red_box_simple_background_pos1.ply")
+    # target = o3d.io.read_point_cloud("SegmentationData/simpleBackground/pos2/red_box_simple_background_pos2.ply")
+    # p3_load, p3_color = combinePoints(source,target)
+    colorSegmenting = False
+    boundingBox = True
+    
+    
+    data = test_routine(files,data, target_colors, target_thresholds)
+
+    print(data)
+    data.to_csv('PointCloudSegmentationData.csv')
+    #source = o3d.io.read_point_cloud(files[8])
+    #target = o3d.io.read_point_cloud(files[i+3])
+    #listOfRedPoints, listOfRedColors = differencePoints(source, target, 0)
+    #pcd = numpyToPC(listOfRedPoints, listOfRedColors)
+
+    #pcd, labels, order_labels = ransacDB(pcd, highlight=False)
+    #objectLabel = likelyObject(pcd, labels, order_labels)
+
+    #pcd = colorSegs(source, [63, 0, 255], 120)
+
+    #bb = getOrienBoundBox(pcd)
+        
+    #vis = o3d.visualization.Visualizer()
+    #vis.create_window()
+        
+    #bb = getOrienBoundBox(pcd)
+    #print(bb.volume())
+    #drawBB(bb, vis)
+        
+    #data = data.append({'Scenario' : 'DBscan_' + files[i].rsplit('/',1)[1].rsplit('_',1)[0], 'Volume' : bb.volume()}, ignore_index = True)
+
+    #vis.add_geometry(pcd)
+    #vis.run()
+    #vis.destroy_window()
+
+    
